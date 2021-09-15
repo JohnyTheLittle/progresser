@@ -9,18 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/johnythelittle/goupdateyourself/configs"
+	models "github.com/johnythelittle/goupdateyourself/models/user"
 	"github.com/johnythelittle/goupdateyourself/mongoutil"
 	"github.com/mitchellh/mapstructure"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type User struct {
-	ID       string `bson:"_id"`
-	Name     string `bson:"username"`
-	Password string `bson:"password"`
-	Email    string `bson:"email"`
-}
 
 var user = mongoutil.DB("user")
 var config, _ = configs.LoadConfig("../")
@@ -30,17 +25,23 @@ func CreateUser(c *gin.Context) {
 	var jwtSecret string = config.Secret
 
 	var HashedPassword []byte
-	var result User
-	var credentials User
+	var result models.User
+	var credentials models.User
 
 	if err := c.ShouldBindJSON(&credentials); err != nil {
-		c.JSON(500, gin.H{"smthng wrong": "with json parsing", "err": err})
+		c.JSON(500, gin.H{"error": "something wrong during json parsing happened", "err": err})
 	}
 
-	err := user.FindOne(context.TODO(), bson.D{{"email", credentials.Email}}).Decode(&result)
-
-	if err != nil {
-		HashedPassword, _ = bcrypt.GenerateFromPassword([]byte(credentials.Password), 10)
+	errEmail := user.FindOne(context.TODO(), bson.D{{"email", credentials.Email}}).Decode(&result)
+	errUserURL := user.FindOne(context.TODO(), bson.D{{"url_name", credentials.URLName}}).Decode(&result)
+	fmt.Println(credentials.URLName)
+	if errEmail != nil {
+		if errUserURL != nil {
+			HashedPassword, _ = bcrypt.GenerateFromPassword([]byte(credentials.Password), 10)
+		} else {
+			c.JSON(http.StatusNonAuthoritativeInfo, "user with such url exists already")
+			return
+		}
 	} else {
 		c.JSON(http.StatusNonAuthoritativeInfo, "user with such email exists already")
 		return
@@ -59,14 +60,14 @@ func CreateUser(c *gin.Context) {
 		})
 	}()
 	go func() {
-		user.InsertOne(context.TODO(), bson.D{{"username", credentials.Name}, {"password", HashedPassword}, {"email", credentials.Email}})
+		user.InsertOne(context.TODO(), bson.D{{"username", credentials.Name}, {"password", HashedPassword}, {"email", credentials.Email}, {"url_name", credentials.URLName}})
 	}()
 
 }
 
 func Login(c *gin.Context) {
-	var credentials User
-	var result User
+	var credentials models.User
+	var result models.User
 	var jwtSecret string = config.Secret
 	if err := c.ShouldBindJSON(&credentials); err != nil {
 		c.JSON(500, gin.H{"something wrong": err})
@@ -97,7 +98,7 @@ func Login(c *gin.Context) {
 }
 func CheckUser(c *gin.Context) {
 	var header http.Header = c.Request.Header
-	var userInfo User
+	var userInfo models.User
 	var stringToken string = header.Get("Authorization")
 	token, err := jwt.Parse(stringToken, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -121,8 +122,38 @@ func CheckUser(c *gin.Context) {
 		c.Set("username", userInfo.Name)
 		c.Set("email", userInfo.Email)
 		c.Set("id", userInfo.ID)
+		c.Set("userURL", userInfo.URLName)
 	} else {
 		c.Abort()
+	}
+
+}
+
+func GetUser(c *gin.Context) {
+	id := c.Query("id")
+	var usr models.User
+	userIDFormatted, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(400, err)
+	}
+	user.FindOne(context.TODO(), bson.D{{"_id", userIDFormatted}}).Decode(&usr)
+	fmt.Println(usr)
+	if len(usr.ID) == 0 {
+		c.JSON(200, gin.H{"data": false})
+	} else {
+		c.JSON(200, gin.H{"data": usr})
+	}
+}
+
+func GetUrl(c *gin.Context) {
+	url := c.Query("url")
+	var usr models.User
+	user.FindOne(context.TODO(), bson.D{{"url_name", url}}).Decode(&usr)
+	var userID string = usr.ID
+	if len(userID) == 0 {
+		c.JSON(200, gin.H{"result": false})
+	} else {
+		c.JSON(200, gin.H{"result": true})
 	}
 
 }

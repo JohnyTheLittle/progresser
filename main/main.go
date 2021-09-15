@@ -19,20 +19,23 @@ func main() {
 
 	mongoutil.DB("")
 
-	v1 := r.Group("/public")
+	publicRoutes := r.Group("/public")
 	{
-		v1.POST("/login", handlers.Login)
-		v1.POST("/register", handlers.CreateUser)
+		go publicRoutes.POST("/login", handlers.Login)
+		go publicRoutes.POST("/register", handlers.CreateUser)
+		go publicRoutes.GET("/user/id", handlers.GetUser)
+		go publicRoutes.GET("/get_url", handlers.GetUrl)
+		//publicRoutes.GET("/user/:user_url")
 	}
 
-	v2 := r.Group("/private", handlers.CheckUser)
+	privateRoutes := r.Group("/private", handlers.CheckUser)
 	{
-		go v2.POST("/addTree", handlers.AddTree)
-		go v2.POST("/addBranch", handlers.AddBranch)
-		go v2.POST("/addNode", handlers.AddNode)
-		go v2.GET("/myTrees", handlers.GetTree)
-
-		go v2.POST("/personalValues", handlers.AddPersonalvalue)
+		go privateRoutes.POST("/makeBranch", handlers.CreateBranch)
+		go privateRoutes.GET("/getBranches", handlers.GetAllBranchesOfUser)
+		go privateRoutes.PUT("/renameBranch", handlers.RenameBranch)
+		go privateRoutes.PUT("/appendBook", handlers.AppendNewElementToBooks)
+		go privateRoutes.PUT("/deleteBook", handlers.DeleteElementFromBooks)
+		go privateRoutes.PUT("/appendVideoCourse", handlers.AddVideoCourse)
 	}
 
 	r.Run(c.Port)
