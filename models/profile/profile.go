@@ -1,11 +1,13 @@
 package models
 
 type Profile struct {
+	Belongs            string             `json:"user" bson:"user"`
 	Age                int                `json:"age" bson:"age"`
 	Education          []Education        `json:"education" bson:"education"`
 	Perks              []Perk             `json:"perks" bson:"perks"`
 	SelfRepresentation SelfRepresentation `json:"description" bson:"description"`
 	Pronounce          string             `json:"pronounce" bson:"pronounce"`
+	IsPrivate          bool               `json:"is_private" bson:"is_private"`
 }
 
 type Education struct {

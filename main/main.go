@@ -36,6 +36,18 @@ func main() {
 		go privateRoutes.PUT("/appendBook", handlers.AppendNewElementToBooks)
 		go privateRoutes.PUT("/deleteBook", handlers.DeleteElementFromBooks)
 		go privateRoutes.PUT("/appendVideoCourse", handlers.AddVideoCourse)
+
+		//profile routes
+		go privateRoutes.GET("/profile", handlers.GetProfile)
+		go privateRoutes.POST("/profile", handlers.SetProfileData)
+		go privateRoutes.PUT("/setAge", handlers.SetAge)
+		go privateRoutes.PUT("/setEducation", handlers.AddEducation)
+		go privateRoutes.PUT("/setPerk", handlers.AddPerk)
+		go privateRoutes.PUT("/setDescription", handlers.AddSelfRepresentation)
+		go privateRoutes.PUT("/togglePrivacy", handlers.TogglePrivacy)
+
+		go privateRoutes.GET("/messages", handlers.GetMyMessages)
+		go privateRoutes.POST("/message", handlers.SendMessage)
 	}
 
 	r.Run(c.Port)

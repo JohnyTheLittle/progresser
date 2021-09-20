@@ -14,6 +14,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,7 +22,7 @@ var user = mongoutil.DB("user")
 var config, _ = configs.LoadConfig("../")
 
 func CreateUser(c *gin.Context) {
-
+	var profile = mongoutil.DB("profile")
 	var jwtSecret string = config.Secret
 
 	var HashedPassword []byte
@@ -34,7 +35,6 @@ func CreateUser(c *gin.Context) {
 
 	errEmail := user.FindOne(context.TODO(), bson.D{{"email", credentials.Email}}).Decode(&result)
 	errUserURL := user.FindOne(context.TODO(), bson.D{{"url_name", credentials.URLName}}).Decode(&result)
-	fmt.Println(credentials.URLName)
 	if errEmail != nil {
 		if errUserURL != nil {
 			HashedPassword, _ = bcrypt.GenerateFromPassword([]byte(credentials.Password), 10)
@@ -59,10 +59,16 @@ func CreateUser(c *gin.Context) {
 			"token": tokenString,
 		})
 	}()
-	go func() {
-		user.InsertOne(context.TODO(), bson.D{{"username", credentials.Name}, {"password", HashedPassword}, {"email", credentials.Email}, {"url_name", credentials.URLName}})
-	}()
 
+	ch := make(chan *mongo.InsertOneResult)
+	go func(ch chan *mongo.InsertOneResult) {
+		i, _ := user.InsertOne(context.TODO(), bson.D{{"username", credentials.Name}, {"password", HashedPassword}, {"email", credentials.Email}, {"url_name", credentials.URLName}})
+		ch <- i
+	}(ch)
+	go func(ch chan *mongo.InsertOneResult) {
+		id := <-ch
+		profile.InsertOne(context.TODO(), bson.M{"user": id.InsertedID, "is_private": true, "age": 0, "education": []string{}, "perks": []string{}, "description": "", "pronounce": ""})
+	}(ch)
 }
 
 func Login(c *gin.Context) {
