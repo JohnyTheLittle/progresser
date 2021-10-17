@@ -1,7 +1,10 @@
 package models
 
+import "go.mongodb.org/mongo-driver/bson/primitive"
+
 type Profile struct {
-	Belongs            string             `json:"user" bson:"user"`
+	ID                 primitive.ObjectID `json:"_id" bson:"_id"`
+	User               string             `bson:"user_id" json:"user_id"`
 	Age                int                `json:"age" bson:"age"`
 	Education          []Education        `json:"education" bson:"education"`
 	Perks              []Perk             `json:"perks" bson:"perks"`
@@ -11,9 +14,10 @@ type Profile struct {
 }
 
 type Education struct {
-	Organization string `json:"organization" bson:"organization"`
-	Level        string `json:"level" bson:"level"`
-	Accomplished bool   `json:"is_accomplished" bson:"is_accomplished"`
+	Organization   string `json:"organization" bson:"organization"`
+	Level          string `json:"level" bson:"level"`
+	Accomplished   bool   `json:"is_accomplished" bson:"is_accomplished"`
+	Specialization string `json:"specialization" bson:"specialization"`
 }
 
 type Perk struct {

@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
 	models "github.com/johnythelittle/goupdateyourself/models/message"
 	"github.com/johnythelittle/goupdateyourself/mongoutil"
 	"go.mongodb.org/mongo-driver/bson"
@@ -15,53 +16,59 @@ import (
 
 var messages = mongoutil.DB("messages")
 
-func GetMyMessages(c *gin.Context) {
-	userId, _ := c.Get("id")
-	formattedUserID, _ := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userId))
-	var msgs []models.Message
-	var msgs_s []models.Message
-	var msgs_r []models.Message
-
-	list_sent, err := messages.Find(context.TODO(), bson.D{{"sender", formattedUserID}})
-	if err != nil {
-		fmt.Println(err)
+func checkParticipants(id primitive.ObjectID, conversationID primitive.ObjectID) (error, []models.Message) {
+	var dialogue models.Dialogue
+	messages.FindOne(context.TODO(), bson.M{"_id": conversationID}).Decode(&dialogue)
+	var b bool = false
+	for _, e := range dialogue.Participants {
+		fmt.Println(e)
+		if id == e {
+			b = true
+		}
 	}
-	if err = list_sent.All(context.TODO(), &msgs_s); err != nil {
-		fmt.Println(err)
+	if !b {
+		return fmt.Errorf("%v", "access denied"), nil
 	}
-
-	list_recieved, err := messages.Find(context.TODO(), bson.D{{"addressee", formattedUserID}})
-	if err != nil {
-		fmt.Println(err)
-	}
-	if err = list_recieved.All(context.TODO(), &msgs_r); err != nil {
-		fmt.Println(err)
-	}
-
-	msgs = append(msgs, msgs_s...)
-	msgs = append(msgs, msgs_r...)
-
-	bs, _ := json.Marshal(msgs)
-	fmt.Println(string(bs))
-	c.JSON(200, gin.H{"data": msgs})
+	return nil, dialogue.Messages
 }
-
 func SendMessage(c *gin.Context) {
 	userId, _ := c.Get("id")
-
-	formattedUserID, _ := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userId))
-
+	userIdFormatted, _ := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userId))
 	var msg models.Message
-
 	c.ShouldBindJSON(&msg)
-	msg.Sender = formattedUserID
+	msg.Sender = userIdFormatted
 	msg.Date = primitive.NewDateTimeFromTime(time.Now())
+	err, msgs := checkParticipants(userIdFormatted, msg.Addressee)
+	if err != nil {
+		c.AbortWithStatusJSON(405, gin.H{"message": "you're not part of this group"})
+	}
+	msgs = append(msgs, msg)
+	messages.UpdateOne(context.TODO(), bson.M{"_id": msg.Addressee}, bson.M{"$push": bson.M{"messages": msg}})
+	c.JSON(200, gin.H{"messages": msgs})
+}
+func AddDialogue(c *gin.Context) {
+	userId, _ := c.Get("id")
+	userIdFormatted, _ := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userId))
+	var dialogue models.Dialogue
+	c.ShouldBindJSON(&dialogue)
+	dialogue.CreatedBy = userIdFormatted
+	dialogue.Participants = append(dialogue.Participants, userIdFormatted)
+	messages.InsertOne(context.TODO(), dialogue)
+	c.JSON(200, gin.H{"data": dialogue})
+}
+func GetMyDialogues(c *gin.Context) {
+	userId, _ := c.Get("id")
+	userIdFormatted, _ := primitive.ObjectIDFromHex(fmt.Sprintf("%v", userId))
+	var dialogues []bson.M
+	cursor, err := messages.Find(context.TODO(), bson.M{"participants": bson.M{"$in": []primitive.ObjectID{userIdFormatted}}})
+	if err != nil {
+		c.AbortWithStatusJSON(501, gin.H{"message": "internal error on server occured"})
+	}
+	if err = cursor.All(context.TODO(), &dialogues); err != nil {
+		log.Println("error")
+	}
+	fmt.Println(dialogues)
 
-	bs, _ := json.Marshal(msg)
-	fmt.Println(string(bs))
-
-	messages.InsertOne(context.TODO(), msg)
-
-	c.JSON(200, gin.H{"data": msg})
+	c.JSON(200, gin.H{"dialogues": dialogues})
 
 }

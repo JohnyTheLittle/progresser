@@ -30,8 +30,9 @@ func CreateUser(c *gin.Context) {
 	var credentials models.User
 
 	if err := c.ShouldBindJSON(&credentials); err != nil {
-		c.JSON(500, gin.H{"error": "something wrong during json parsing happened", "err": err})
+		c.Status(500)
 	}
+	fmt.Println(credentials)
 
 	errEmail := user.FindOne(context.TODO(), bson.D{{"email", credentials.Email}}).Decode(&result)
 	errUserURL := user.FindOne(context.TODO(), bson.D{{"url_name", credentials.URLName}}).Decode(&result)
@@ -67,7 +68,7 @@ func CreateUser(c *gin.Context) {
 	}(ch)
 	go func(ch chan *mongo.InsertOneResult) {
 		id := <-ch
-		profile.InsertOne(context.TODO(), bson.M{"user": id.InsertedID, "is_private": true, "age": 0, "education": []string{}, "perks": []string{}, "description": "", "pronounce": ""})
+		profile.InsertOne(context.TODO(), bson.M{"user_id": id.InsertedID.(primitive.ObjectID).Hex(), "is_private": true, "age": 0, "education": []string{}, "perks": []string{}, "description": bson.D{{"text", ""}}, "pronounce": ""})
 	}(ch)
 }
 
@@ -105,7 +106,7 @@ func Login(c *gin.Context) {
 func CheckUser(c *gin.Context) {
 	var header http.Header = c.Request.Header
 	var userInfo models.User
-	var stringToken string = header.Get("Authorization")
+	var stringToken string = header.Get("authorization")
 	token, err := jwt.Parse(stringToken, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("ERROR ERROR")
@@ -113,10 +114,9 @@ func CheckUser(c *gin.Context) {
 		return []byte(config.Secret), nil
 	})
 	if err != nil {
-		c.JSON(400, gin.H{
-			"error": err,
-		})
-		c.Abort()
+		fmt.Println(">>>>>>>>")
+		fmt.Println(err)
+		c.AbortWithError(405, err)
 	}
 	if token.Valid {
 		mapstructure.Decode(token.Claims, &userInfo)
@@ -129,13 +129,21 @@ func CheckUser(c *gin.Context) {
 		c.Set("email", userInfo.Email)
 		c.Set("id", userInfo.ID)
 		c.Set("userURL", userInfo.URLName)
+
 	} else {
-		c.Abort()
+		c.AbortWithStatusJSON(405, "UNAUTHORIZED")
 	}
 
 }
 
 func GetUser(c *gin.Context) {
+	//i wrote these lines because of fundamental issue of CORS framework which behaves like a peace of junk wnen i redirect route to group
+	//c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5500/")
+	//c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+	//c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, UPDATE")
+	//c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Max")
+	//c.Writer.Header().Set("Access-Control-Allow-Credentials", "false")
+
 	id := c.Query("id")
 	var usr models.User
 	userIDFormatted, err := primitive.ObjectIDFromHex(id)
@@ -144,6 +152,7 @@ func GetUser(c *gin.Context) {
 	}
 	user.FindOne(context.TODO(), bson.D{{"_id", userIDFormatted}}).Decode(&usr)
 	fmt.Println(usr)
+	usr.Password = ""
 	if len(usr.ID) == 0 {
 		c.JSON(200, gin.H{"data": false})
 	} else {
@@ -156,10 +165,18 @@ func GetUrl(c *gin.Context) {
 	var usr models.User
 	user.FindOne(context.TODO(), bson.D{{"url_name", url}}).Decode(&usr)
 	var userID string = usr.ID
-	if len(userID) == 0 {
+	if userID == "" {
 		c.JSON(200, gin.H{"result": false})
 	} else {
 		c.JSON(200, gin.H{"result": true})
 	}
+}
 
+func GetMe(c *gin.Context) {
+
+	username, _ := c.Get("username")
+	email, _ := c.Get("email")
+	id, _ := c.Get("id")
+	userUrl, _ := c.Get("userURL")
+	c.JSON(http.StatusOK, gin.H{"username": username, "email": email, "id": id, "userUrl": userUrl})
 }

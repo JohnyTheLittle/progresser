@@ -29,4 +29,5 @@ func DB(cllctn string) *mongo.Collection {
 	}
 
 	return client.Database("tasker").Collection(cllctn)
+
 }

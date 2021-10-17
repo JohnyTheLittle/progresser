@@ -20,13 +20,13 @@ func CreateBranch(c *gin.Context) {
 	user_id, _ := c.Get("id")
 	err := c.ShouldBindJSON(&bpfc)
 	if err == nil {
-		res, err := branch.InsertOne(context.TODO(), bson.D{{"user", user_id}, {"name_of_branch", bpfc.Name}, {"books", bpfc.Books}, {"projects", bpfc.Projects}, {"imrovements", bpfc.Improvement}, {"is_private", true}, {"video_courses", bpfc.VideoCourses}}, nil)
+		res, err := branch.InsertOne(context.TODO(), bson.D{{"user", user_id}, {"name_of_branch", bpfc.Name}, {"books", bpfc.Books}, {"projects", bpfc.Projects}, {"imrovements", bpfc.Improvement}, {"is_private", true}, {"video_courses", bpfc.VideoCourses}, {"queue", []models.QueueElement{}}}, nil)
 		if err != nil {
 			c.JSON(500, gin.H{
 				"err": err,
 			})
 		} else {
-			c.JSON(500, gin.H{
+			c.JSON(200, gin.H{
 				"data": res,
 			})
 		}
@@ -42,7 +42,6 @@ func GetAllBranchesOfUser(c *gin.Context) {
 	}
 
 	result.All(context.TODO(), &usersBranches)
-	fmt.Println(usersBranches)
 	c.JSON(200, usersBranches)
 }
 
@@ -101,14 +100,42 @@ func AppendNewElementToBooks(c *gin.Context) {
 		}
 	}(id_formatted)
 	func(book models.Book) {
-		fmt.Println(branch_.Books)
-		fmt.Println(book)
 		updatedList := append(branch_.Books, book)
-		fmt.Println(updatedList)
 		branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"books", updatedList}}}})
 		c.JSON(200, gin.H{"result": "SUCCESS"})
 	}(new_book.Book)
 }
+
+func UpdateBookStage(c *gin.Context) {
+	user_id, _ := c.Get("id")
+	type ModifiedInfo struct {
+		ID       string      `json:"ID"`
+		Num      int         `json:"num"`
+		BookInfo models.Book `json:"book"`
+	}
+	var info ModifiedInfo
+	c.ShouldBindJSON(&info)
+	id_formatted, _ := primitive.ObjectIDFromHex(info.ID)
+	var branch_ models.Branch
+
+	func(id primitive.ObjectID) {
+		err := branch.FindOne(context.TODO(), bson.D{{"_id", id}}).Decode(&branch_)
+		if err != nil {
+			fmt.Println(err)
+			c.AbortWithStatus(405)
+		}
+		if user_id != branch_.Belongs {
+			fmt.Println("USER TRIED MODIFY NOT HER OWN BOOK")
+			c.AbortWithStatus(405)
+		}
+	}(id_formatted)
+
+	updatedBooksList := branch_.Books
+	updatedBooksList[info.Num] = info.BookInfo
+	branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"books", updatedBooksList}}}})
+
+}
+
 func DeleteElementFromBooks(c *gin.Context) {
 	user_id, _ := c.Get("id")
 	type DeletedBook struct {

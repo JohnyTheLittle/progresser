@@ -3,6 +3,7 @@ module github.com/johnythelittle/goupdateyourself
 go 1.16
 
 require (
+	github.com/gin-gonic/contrib v0.0.0-20201101042839-6a891bf89f19
 	github.com/gin-gonic/gin v1.7.4
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/snappy v0.0.3 // indirect
