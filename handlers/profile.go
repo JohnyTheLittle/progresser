@@ -17,10 +17,7 @@ var profile = mongoutil.DB("profile")
 var branches = mongoutil.DB("branches")
 
 func GetMyProfile(c *gin.Context) {
-	fmt.Println("here")
-
 	userId, _ := c.Get("id")
-	fmt.Printf("userId: %v\n", userId)
 	var myProfile models.Profile
 	profile.FindOne(context.TODO(), bson.M{"user_id": userId}).Decode(&myProfile)
 	c.JSON(200, gin.H{"data": myProfile})
@@ -30,7 +27,6 @@ func GetProfile(c *gin.Context) {
 	//ADD BLACK LILST
 	//blacklist := mongoutil.DB("bl")
 	requiredURL := c.Query("url_name")
-	fmt.Println("URL_NAME", requiredURL)
 	var user_ userModel.User
 	var profile_ models.Profile
 	var branches_ []branchModel.Branch
@@ -82,7 +78,6 @@ func SetAge(c *gin.Context) {
 }
 
 func AddEducation(c *gin.Context) {
-	fmt.Println("hello there")
 	userId, _ := c.Get("id")
 	type Education struct {
 		Education models.Education `json:"edu"`
@@ -203,8 +198,6 @@ func SetProfileData(c *gin.Context) {
 	var requiredProfile models.Profile
 
 	profile.FindOne(context.TODO(), bson.D{{"user_id", userId}}).Decode(&requiredProfile)
-
-	fmt.Println("BELONGS:::", requiredProfile)
 
 	if requiredProfile.User == userId {
 		profile.UpdateOne(context.TODO(), bson.M{"user_id": userId}, bson.D{{"$set", bson.D{{"age", profileInfo.Age}, {"education", profileInfo.Education}, {"perks", profileInfo.Perks}, {"description", profileInfo.SelfRepresentation}, {"pronounce", profileInfo.Pronounce}, {"is_private", profileInfo.IsPrivate}}}})
