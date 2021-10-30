@@ -10,6 +10,7 @@ type Branch struct {
 	Books        []Book              `bson:"books" json:"books"`
 	Projects     []Project           `bson:"projects" json:"projects"`
 	Improvement  []Improvement       `bson:"impovments" json:"impovments"`
+	Articles     []Article           `bson:"articles" json:"articles"`
 	Hours        int                 `bson:"hours" json:"hours"`
 	IsPrivate    bool                `bson:"is_private" json:"is_private"`
 	VideoCourses []VideoCourse       `bson:"video_courses" json:"video_courses"`
@@ -34,6 +35,10 @@ type Book struct {
 	TotalPages   int    `bson:"total_pages" json:"total_pages"`
 	Pages        int    `bson:"pages" json:"pages"`
 	Hours        int    `bson:"hours" json:"hours"`
+}
+type Article struct {
+	Header string `bson:"header_of_article" json:"header_of_article"`
+	Link   string `bson:"link_to_article" json:"link_to_article"`
 }
 
 type QueueElement struct {

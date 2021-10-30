@@ -32,7 +32,6 @@ func CreateUser(c *gin.Context) {
 	if err := c.ShouldBindJSON(&credentials); err != nil {
 		c.Status(500)
 	}
-	fmt.Println(credentials)
 
 	errEmail := user.FindOne(context.TODO(), bson.D{{"email", credentials.Email}}).Decode(&result)
 	errUserURL := user.FindOne(context.TODO(), bson.D{{"url_name", credentials.URLName}}).Decode(&result)
@@ -73,6 +72,7 @@ func CreateUser(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
+	fmt.Println("CHIPPING IN")
 	var credentials models.User
 	var result models.User
 	var jwtSecret string = config.Secret
@@ -114,7 +114,6 @@ func CheckUser(c *gin.Context) {
 		return []byte(config.Secret), nil
 	})
 	if err != nil {
-		fmt.Println(">>>>>>>>")
 		fmt.Println(err)
 		c.AbortWithError(405, err)
 	}
@@ -122,14 +121,13 @@ func CheckUser(c *gin.Context) {
 		mapstructure.Decode(token.Claims, &userInfo)
 		err := user.FindOne(context.TODO(), bson.D{{"email", userInfo.Email}}).Decode(&userInfo)
 		if err != nil {
-			fmt.Println("error during looking there", err)
+			fmt.Println("ERROR CANNOT FIND USER", err)
 			c.AbortWithError(400, err)
 		}
 		c.Set("username", userInfo.Name)
 		c.Set("email", userInfo.Email)
 		c.Set("id", userInfo.ID)
 		c.Set("userURL", userInfo.URLName)
-
 	} else {
 		c.AbortWithStatusJSON(405, "UNAUTHORIZED")
 	}
@@ -151,7 +149,7 @@ func GetUser(c *gin.Context) {
 		c.JSON(400, err)
 	}
 	user.FindOne(context.TODO(), bson.D{{"_id", userIDFormatted}}).Decode(&usr)
-	fmt.Println(usr)
+
 	usr.Password = ""
 	if len(usr.ID) == 0 {
 		c.JSON(200, gin.H{"data": false})
@@ -173,7 +171,7 @@ func GetUrl(c *gin.Context) {
 }
 
 func GetMe(c *gin.Context) {
-
+	fmt.Println(">>>>")
 	username, _ := c.Get("username")
 	email, _ := c.Get("email")
 	id, _ := c.Get("id")

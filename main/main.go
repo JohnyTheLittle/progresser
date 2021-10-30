@@ -8,6 +8,7 @@ import (
 	"github.com/johnythelittle/goupdateyourself/configs"
 	"github.com/johnythelittle/goupdateyourself/handlers"
 	"github.com/johnythelittle/goupdateyourself/mongoutil"
+	wsserver "github.com/johnythelittle/goupdateyourself/sockets"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
@@ -50,44 +51,47 @@ func main() {
 	r.Use(CORSMiddleware())
 	mongoutil.DB("")
 
-	r.GET("content/public_profiles", handlers.GetPublicUsers)
-
+	go wsserver.Manager.Start()
 	r.POST("public/login", handlers.Login)
 	r.POST("public/register/", handlers.CreateUser)
-	r.GET("public/user_id/", handlers.GetUser)
-	r.GET("get_url/", handlers.GetUrl)
-	//publicRoutes.GET("/user/:user_url")
+	go r.GET("content/public_profiles", handlers.GetPublicUsers)
+	go r.GET("/ws/", wsserver.ChatHandler)
 
-	r.Use(handlers.CheckUser).GET("me/", handlers.GetMe)                //✅
-	r.Use(handlers.CheckUser).POST("makeBranch", handlers.CreateBranch) //✅
-	r.Use(handlers.CheckUser).GET("getBranches/", handlers.GetAllBranchesOfUser)
-	r.Use(handlers.CheckUser).PUT("renameBranch", handlers.RenameBranch)
-	r.Use(handlers.CheckUser).PUT("appendBook", handlers.AppendNewElementToBooks)
-	r.Use(handlers.CheckUser).PUT("modifyBook", handlers.UpdateBookStage)
-	r.Use(handlers.CheckUser).PUT("deleteBook", handlers.DeleteElementFromBooks)
-	r.Use(handlers.CheckUser).PUT("appendVideoCourse", handlers.AddVideoCourse)
+	go r.GET("public/user_id/", handlers.GetUser)
+	go r.GET("get_url/", handlers.GetUrl)
+	//publicRoutes.GET("/user/:user_url")
+	go r.Use(handlers.CheckUser).GET("me", handlers.GetMe)                          //✅
+	go r.Use(handlers.CheckUser).POST("makeBranch", handlers.CreateBranch)          //✅
+	go r.Use(handlers.CheckUser).GET("getBranches/", handlers.GetAllBranchesOfUser) //✅
+	go r.Use(handlers.CheckUser).PUT("renameBranch", handlers.RenameBranch)
+	go r.Use(handlers.CheckUser).PUT("appendBook", handlers.AppendNewElementToBooks)   //✅
+	go r.Use(handlers.CheckUser).PUT("modifyBook", handlers.UpdateBookStage)           //✅
+	go r.Use(handlers.CheckUser).DELETE("deleteBook", handlers.DeleteElementFromBooks) //✅
+	go r.Use(handlers.CheckUser).PUT("appendVideoCourse", handlers.AddVideoCourse)     //✅
+	go r.Use(handlers.CheckUser).DELETE("deleteVideoCourse", handlers.DeleteVideoCourse)
+	go r.Use(handlers.CheckUser).PUT("appendArticle/", handlers.AddArticle)       //✅
+	go r.Use(handlers.CheckUser).DELETE("deleteArticle/", handlers.DeleteArticle) //✅
 
 	//profile routes
-	r.Use(handlers.CheckUser).GET("getMyProfile/", handlers.GetMyProfile) //✅
-	r.Use(handlers.CheckUser).GET("profile", handlers.GetProfile)         //✅
-	r.Use(handlers.CheckUser).POST("profile", handlers.SetProfileData)    //✅
-	r.Use(handlers.CheckUser).PUT("setAge", handlers.SetAge)              //✅
-	r.Use(handlers.CheckUser).PUT("setEducation", handlers.AddEducation)  //✅
-	r.Use(handlers.CheckUser).DELETE("deleteEducation", handlers.DeleteEducation)
-	r.Use(handlers.CheckUser).PUT("setPerk", handlers.AddPerk) //✅
-	r.Use(handlers.CheckUser).DELETE("deletePerk", handlers.DeletePerk)
-	r.Use(handlers.CheckUser).PUT("setDescription", handlers.AddSelfRepresentation) //✅
-	r.Use(handlers.CheckUser).PUT("togglePrivacy", handlers.TogglePrivacy)          //✅
-	r.Use(handlers.CheckUser).PUT("setPronounce", handlers.SetPronounce)
+	go r.Use(handlers.CheckUser).GET("getMyProfile/", handlers.GetMyProfile) //✅
+	go r.Use(handlers.CheckUser).GET("profile/", handlers.GetProfile)        //✅
+	go r.Use(handlers.CheckUser).POST("profile", handlers.SetProfileData)    //✅
+	go r.Use(handlers.CheckUser).PUT("setAge", handlers.SetAge)              //✅
+	go r.Use(handlers.CheckUser).PUT("setEducation", handlers.AddEducation)  //✅
+	go r.Use(handlers.CheckUser).DELETE("deleteEducation", handlers.DeleteEducation)
+	go r.Use(handlers.CheckUser).PUT("setPerk", handlers.AddPerk) //✅
+	go r.Use(handlers.CheckUser).DELETE("deletePerk", handlers.DeletePerk)
+	go r.Use(handlers.CheckUser).PUT("setDescription", handlers.AddSelfRepresentation) //✅
+	go r.Use(handlers.CheckUser).PUT("togglePrivacy", handlers.TogglePrivacy)          //✅
+	go r.Use(handlers.CheckUser).PUT("setPronounce", handlers.SetPronounce)
 
 	//blacklist
 	r.POST("/addToBlackList", handlers.AddToBlackList)
 	r.DELETE("/deleteFromBlackList", handlers.RemoveFromBlackList)
 
 	//messages
-	r.POST("/addDialogue", handlers.AddDialogue)
-	r.POST("/sendMessage", handlers.SendMessage)
-	r.GET("/getMyMessages", handlers.GetMyDialogues)
+
+	//r.Use(handlers.CheckUser).GET("/sendMessage", wsserver.ChatHandler)
 
 	r.Run(c.Port)
 }

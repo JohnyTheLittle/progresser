@@ -5,15 +5,22 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	branchModel "github.com/johnythelittle/goupdateyourself/models/branch"
 	models "github.com/johnythelittle/goupdateyourself/models/profile"
+	userModel "github.com/johnythelittle/goupdateyourself/models/user"
+
 	"github.com/johnythelittle/goupdateyourself/mongoutil"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 var profile = mongoutil.DB("profile")
+var branches = mongoutil.DB("branches")
 
 func GetMyProfile(c *gin.Context) {
+	fmt.Println("here")
+
 	userId, _ := c.Get("id")
+	fmt.Printf("userId: %v\n", userId)
 	var myProfile models.Profile
 	profile.FindOne(context.TODO(), bson.M{"user_id": userId}).Decode(&myProfile)
 	c.JSON(200, gin.H{"data": myProfile})
@@ -22,18 +29,33 @@ func GetMyProfile(c *gin.Context) {
 func GetProfile(c *gin.Context) {
 	//ADD BLACK LILST
 	//blacklist := mongoutil.DB("bl")
-	requiredId := c.Query("id")
+	requiredURL := c.Query("url_name")
+	fmt.Println("URL_NAME", requiredURL)
+	var user_ userModel.User
 	var profile_ models.Profile
+	var branches_ []branchModel.Branch
+	user.FindOne(context.TODO(), bson.M{"url_name": requiredURL}).Decode(&user_)
+	user_.Password = ""
+	profile.FindOne(context.TODO(), bson.M{"user_id": user_.ID}).Decode(&profile_)
+	cur, _ := branches.Find(context.TODO(), bson.M{"user": user_.ID}, nil)
 
-	profile.FindOne(context.TODO(), bson.M{"user_id": requiredId}).Decode(&profile_)
-
-	//blacklist.FindOne(context.TODO(), bson.D{{}})
-
-	if profile_.IsPrivate {
-		c.AbortWithStatusJSON(405, gin.H{"message": "ACCESS DENIED"})
-	} else {
-		c.JSON(200, gin.H{"data": profile_})
+	for cur.Next(context.TODO()) {
+		var result branchModel.Branch
+		err := cur.Decode(&result)
+		if err == nil {
+			branches_ = append(branches_, result)
+		}
 	}
+	//blacklist.FindOne(context.TODO(), bson.D{{}})
+	if profile_.IsPrivate {
+		c.JSON(405, gin.H{"error": "ACCESS DENIED"})
+		return
+	}
+	if profile_.ID.IsZero() {
+		c.JSON(404, gin.H{"msg": "not found"})
+		return
+	}
+	c.JSON(200, gin.H{"user": user_, "profile": profile_, "branches": branches_})
 
 }
 
@@ -60,6 +82,7 @@ func SetAge(c *gin.Context) {
 }
 
 func AddEducation(c *gin.Context) {
+	fmt.Println("hello there")
 	userId, _ := c.Get("id")
 	type Education struct {
 		Education models.Education `json:"edu"`

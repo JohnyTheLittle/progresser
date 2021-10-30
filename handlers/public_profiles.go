@@ -41,12 +41,6 @@ func GetPublicUsers(c *gin.Context) {
 		}()
 	}
 
-	fmt.Println("USER IDS", userIds)
-
-	fmt.Println()
-	fmt.Println()
-	fmt.Println()
-
 	fmt.Println(foundUsers)
 
 	type CombinedModel struct {

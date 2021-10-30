@@ -20,7 +20,7 @@ func CreateBranch(c *gin.Context) {
 	user_id, _ := c.Get("id")
 	err := c.ShouldBindJSON(&bpfc)
 	if err == nil {
-		res, err := branch.InsertOne(context.TODO(), bson.D{{"user", user_id}, {"name_of_branch", bpfc.Name}, {"books", bpfc.Books}, {"projects", bpfc.Projects}, {"imrovements", bpfc.Improvement}, {"is_private", true}, {"video_courses", bpfc.VideoCourses}, {"queue", []models.QueueElement{}}}, nil)
+		res, err := branch.InsertOne(context.TODO(), bson.D{{"user", user_id}, {"name_of_branch", bpfc.Name}, {"books", []models.Book{}}, {"projects", []models.Project{}}, {"imrovements", []models.Improvement{}}, {"is_private", true}, {"video_courses", []models.VideoCourse{}}, {"articles", []models.Article{}}, {"queue", []models.QueueElement{}}}, nil)
 		if err != nil {
 			c.JSON(500, gin.H{
 				"err": err,
@@ -50,7 +50,7 @@ func RenameBranch(c *gin.Context) {
 
 	type NewNameJson struct {
 		NewName string `json:"newName"`
-		ID      string `json:"id"`
+		ID      string `json:"ID"`
 	}
 
 	var new_name NewNameJson
@@ -115,24 +115,28 @@ func UpdateBookStage(c *gin.Context) {
 	}
 	var info ModifiedInfo
 	c.ShouldBindJSON(&info)
-	id_formatted, _ := primitive.ObjectIDFromHex(info.ID)
+	branch_id_formatted, _ := primitive.ObjectIDFromHex(info.ID)
 	var branch_ models.Branch
+	func() {
+		err := branch.FindOne(context.TODO(), bson.D{{"_id", branch_id_formatted}}).Decode(&branch_)
 
-	func(id primitive.ObjectID) {
-		err := branch.FindOne(context.TODO(), bson.D{{"_id", id}}).Decode(&branch_)
 		if err != nil {
 			fmt.Println(err)
 			c.AbortWithStatus(405)
 		}
+
 		if user_id != branch_.Belongs {
 			fmt.Println("USER TRIED MODIFY NOT HER OWN BOOK")
 			c.AbortWithStatus(405)
 		}
-	}(id_formatted)
+	}()
 
+	fmt.Println("numberofbook", info.Num)
 	updatedBooksList := branch_.Books
+	fmt.Println("before", updatedBooksList)
 	updatedBooksList[info.Num] = info.BookInfo
-	branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"books", updatedBooksList}}}})
+	fmt.Println("after", updatedBooksList)
+	branch.UpdateOne(context.TODO(), bson.M{"_id": branch_id_formatted}, bson.D{{"$set", bson.D{{"books", updatedBooksList}}}})
 
 }
 
@@ -158,7 +162,10 @@ func DeleteElementFromBooks(c *gin.Context) {
 		}
 	}(id_formatted)
 	func(numberOfBook int) {
+		fmt.Println(numberOfBook)
+		fmt.Println("before", branch_.Books)
 		updatedList := append(branch_.Books[:numberOfBook], branch_.Books[numberOfBook+1:]...)
+		fmt.Println("after", updatedList)
 		branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"books", updatedList}}}})
 		c.JSON(200, gin.H{"result": "SUCCESS"})
 	}(deletedBook.Num)
@@ -192,4 +199,92 @@ func AddVideoCourse(c *gin.Context) {
 		branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"video_courses", updatedList}}}})
 		c.JSON(200, gin.H{"result": "SUCCESS"})
 	}(video_course.VideoCourse)
+}
+
+func AddArticle(c *gin.Context) {
+	fmt.Println("ADDING ARTICLE")
+	user_id, _ := c.Get("id")
+	type AddedArticle struct {
+		ID      string         `json:"ID"`
+		Article models.Article `json:"article"`
+	}
+	var article AddedArticle
+	var branch_ models.Branch
+
+	c.ShouldBindJSON(&article)
+
+	id_formatted, _ := primitive.ObjectIDFromHex(article.ID)
+	err := branch.FindOne(context.TODO(), bson.D{{"_id", id_formatted}}).Decode(&branch_)
+
+	if err != nil {
+		fmt.Println("there is no such a branch")
+		c.AbortWithStatus(404)
+		return
+	}
+
+	if user_id != branch_.Belongs {
+		fmt.Println("ATTEMPTION TO APPEND ARTICLE TO FOREIGN BRANCH")
+		c.AbortWithStatus(405)
+		return
+	}
+	updatedList := append(branch_.Articles, article.Article)
+	branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.D{{"$set", bson.D{{"articles", updatedList}}}})
+	c.JSON(200, gin.H{"result": "SUCCESS"})
+}
+
+func DeleteArticle(c *gin.Context) {
+	user_id, _ := c.Get("id")
+	type DeletedArticle struct {
+		ID  string `json:"ID"`
+		Num int    `json:"num"`
+	}
+	var deletedArticle DeletedArticle
+	c.ShouldBindJSON(&deletedArticle)
+	id_formatted, _ := primitive.ObjectIDFromHex(deletedArticle.ID)
+
+	var branch_ models.Branch
+
+	err := branch.FindOne(context.TODO(), bson.D{{"_id", id_formatted}}).Decode(&branch_)
+	if err != nil {
+		fmt.Println(err)
+		c.AbortWithStatus(404)
+		return
+	}
+	if user_id != branch_.Belongs {
+		fmt.Println("METHOD NOT ALLOWED")
+		c.AbortWithStatus(405)
+		return
+	}
+	updatedList := append(branch_.Articles[:deletedArticle.Num], branch_.Articles[deletedArticle.Num+1:]...)
+	branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.M{"$set": bson.M{"articles": updatedList}})
+	c.Status(200)
+}
+
+func DeleteVideoCourse(c *gin.Context) {
+	user_id, _ := c.Get("id")
+	type DeletedCourse struct {
+		ID  string `json:"ID"`
+		Num int    `json:"num"`
+	}
+	var deletedCourse DeletedCourse
+	c.ShouldBindJSON(&deletedCourse)
+
+	id_formatted, _ := primitive.ObjectIDFromHex(deletedCourse.ID)
+
+	var branch_ models.Branch
+
+	err := branch.FindOne(context.TODO(), bson.D{{"_id", id_formatted}}).Decode(&branch_)
+	if err != nil {
+		fmt.Println(err)
+		c.AbortWithStatus(404)
+		return
+	}
+	if user_id != branch_.Belongs {
+		fmt.Println("METHOD NOT ALLOWED")
+		c.AbortWithStatus(405)
+		return
+	}
+	updatedList := append(branch_.VideoCourses[:deletedCourse.Num], branch_.VideoCourses[deletedCourse.Num+1:]...)
+	branch.UpdateOne(context.TODO(), bson.M{"_id": id_formatted}, bson.M{"$set": bson.M{"video_courses": updatedList}})
+	c.Status(200)
 }
